@@ -1,0 +1,47 @@
+{
+  "name": "dsh-plugin-artifacts",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "我的产物：DSH 侧栏一级入口 + 独立页面，管理会话/共享产物（网格与列表、类型筛选、预览、重命名、移动、回收站、zip 归档、可选 COS 云端手动上传）。",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/zmengle/dsh-plugin-artifacts.git"
+  },
+  "homepage": "https://github.com/zmengle/dsh-plugin-artifacts#readme",
+  "bugs": {
+    "url": "https://github.com/zmengle/dsh-plugin-artifacts/issues"
+  },
+  "main": "./index.js",
+  "exports": {
+    ".": "./index.js",
+    "./client": "./client.js",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "index.js",
+    "client.js",
+    "lib",
+    "cordis.patch.yml",
+    "README.md"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web"
+    }
+  },
+  "keywords": [
+    "dsh-plugin",
+    "deepseek-harness",
+    "artifacts",
+    "deliverables",
+    "file-manager",
+    "我的产物"
+  ],
+  "license": "MIT"
+}

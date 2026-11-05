@@ -1,0 +1,7 @@
+# 我的产物 bundle patch：插入一条行，注册双面插件（host + client）。
+# 行 id 必须与 cordis 的条目 id 一致；name 必须能解析到这个包（profile 里是 file: / link: 依赖）。
+# 可选配置：workspaceRoot 不填时自动取宿主的默认工作目录。
+- insert:
+    - id: artifacts
+      name: dsh-plugin-artifacts
+      config: {}

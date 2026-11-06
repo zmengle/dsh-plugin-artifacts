@@ -1,14 +1,30 @@
 # dsh-plugin-artifacts · 我的产物
 
-DSH 的**侧栏一级入口 + 独立页面**，把工作区里的产物集中管起来：会话里生成的文件、`artifacts/` 里的共享素材，一个页面看完 —— 网格/列表、按类型与来源筛、预览、重命名、移动、回收站、zip 归档，以及**可选的**腾讯云 COS 手动上传。
+> **English (TL;DR)** — A sidebar-first artifact manager for DSH. It separates what you actually *delivered* from
+> the noise around it: every file is classified as **product / scratch / memory / asset**, so the default view is
+> just your deliverables. Grid & list, 12 file types, time axis with year/month/day grouping, preview, rename,
+> trash with restore, zip archive, multi-workspace roots, and optional manual sync to Tencent COS
+> (off by default — no background uploads unless you turn it on).
+> Requires DSH ≥ 2.0.21 (`sidebar.panellist` + `main` slots). Zero runtime dependencies.
 
-设计基线：[`sessions/2026-11-01-persona-mgmt/plugin-design-artifact-manager.md`](../sessions/2026-11-01-persona-mgmt/plugin-design-artifact-manager.md)（v1.2）。
+DSH 的**侧栏一级入口 + 独立页面**，把工作区里的产物集中管起来：会话里生成的文件、`artifacts/` 里的共享素材。
 
-![浅色 · 网格](docs/grid-light.png)
+核心不是"文件浏览器"，而是**分得清哪些是你要的东西**：每个文件都有角色（产物 / 过程 / 记忆 / 素材），
+默认只看产物；过程文件（测试脚本、截图、夹具）要你在顶部切过去才出现。
 
-| 深色 | 回收站 | 云端（已同步） | 卡片悬停 | 预览（含本地路径） | 卡片菜单 | 批量选择 |
-|---|---|---|---|---|---|---|
-| ![深色](docs/grid-dark.png) | ![回收站](docs/trash.png) | ![云端已同步](docs/cloud-synced.png) | ![悬停](docs/card-hover.png) | ![预览](docs/preview.png) | ![菜单](docs/menu.png) | ![选择](docs/selection.png) |
+- 网格 / 列表、12 类文件类型、按来源与角色筛、按 创建/修改 时间排序并按 年·月·日 分组
+- 预览、重命名、移动、回收站、zip 归档、整理模式（规则自动判 + 人工覆盖）
+- 多工作区（最多 8 个根）、可选 COS 云端（手动上传 / 定时只重传改过的文件 / 孤儿记录可清）
+
+**要求**：DSH ≥ 2.0.21（用到了 `sidebar.panellist` 与 `main` keyed slot）；Node ≥ 20；零运行时依赖。
+
+![浅色 · 网格](https://raw.githubusercontent.com/zmengle/dsh-plugin-artifacts/main/docs/grid-light.png)
+
+| 深色 | 按月分组 | 整理模式 | 云端（已同步） | 预览（含本地路径） | 卡片菜单 |
+|---|---|---|---|---|---|
+| ![深色](https://raw.githubusercontent.com/zmengle/dsh-plugin-artifacts/main/docs/grid-dark.png) | ![按月分组](https://raw.githubusercontent.com/zmengle/dsh-plugin-artifacts/main/docs/group-month.png) | ![整理模式](https://raw.githubusercontent.com/zmengle/dsh-plugin-artifacts/main/docs/curate-search.png) | ![云端已同步](https://raw.githubusercontent.com/zmengle/dsh-plugin-artifacts/main/docs/cloud-synced.png) | ![预览](https://raw.githubusercontent.com/zmengle/dsh-plugin-artifacts/main/docs/preview.png) | ![菜单](https://raw.githubusercontent.com/zmengle/dsh-plugin-artifacts/main/docs/menu.png) |
+
+> 设计基线：[`plugin-design-v3-artifact-model.md`](https://github.com/zmengle/dsh-plugin-artifacts/blob/main/docs/design-v3.md)（角色 × 类型模型）。
 
 ---
 
@@ -17,21 +33,30 @@ DSH 的**侧栏一级入口 + 独立页面**，把工作区里的产物集中管
 **做**
 
 - 独立页面「我的产物」，侧栏一级入口（`sidebar.panellist` → `main` keyed 面板，点图标即进）。
-- 本地：浏览、搜索、类型/来源筛选、排序、网格/列表、预览、重命名、移动、下载、另存为、删除到回收站、还原、彻底删除、打包归档。
-- 单工作区：只看当前宿主的默认工作目录（`<workspace>/sessions` 与 `<workspace>/artifacts`）。
-- 云端：只有用户填好 COS 配置并手动开启后才可用；**上传永远手动点**，没有定时器、没有后台同步；下载会先让你选落地目录。
+- **角色分层**：产物 / 过程 / 记忆 / 素材，规则自动判定，整理模式里可逐条或按目录覆盖。
+- **多工作区**：主工作区之外可再加最多 7 个目录；不要求 `sessions/` 结构，文件堆在根目录也能扫。
+- 本地：搜索、类型/角色/来源筛选、时间轴分组、网格/列表、预览、重命名、移动、下载、删除到回收站、还原、打包归档。
+- 云端：**可选**。填好 COS 配置并手动开启后才可用；上传永远是手动点。自动同步默认关闭，开启后也只重传
+  「已经传过、但本地改过」的文件，从不主动上传新文件。
+- 备份范围：仅产物 / 产物 + 记忆；过程与素材永不上传。
 
 **不做**
 
-- 不做项目树 / 分组 / 工作区切换（那是 DSH 既有导航）。
-- 不做自动上传、不做版本控制、不做多人协作。
-- 不做 office / 视频缩略图 —— 只有图片有缩略图，其余显示类型图标。
+- 不做项目树、不做代码编辑器、不做版本控制、不做多人协作 —— 那些是别的工具的活。
+- 不做 office / 视频缩略图：只有图片有缩略图，其余显示类型图标。
+- 不做后台全量同步：没有"把整个工作区镜像到云端"这种能力，也不打算做。
 
 ---
 
 ## 2. 安装
 
-插件是本地包，profile 里用 `link:` 依赖 + `bundles` 末尾挂一行即可（和 `dsh-plugin-sticky-wall` 同样的装法）：
+从市场安装：
+
+```bash
+dsh plugin --profile desktop add dsh-plugin-artifacts
+```
+
+本地开发（改代码、跑测试）用 `link:`：
 
 ```powershell
 # 1) 在 profile 目录加依赖（D:\Users\<you>\.dsh\profiles\desktop\package.json）
@@ -308,7 +333,20 @@ pnpm install
 
 ## 8. 验证
 
-重启宿主后可以先跑一条自检，确认 v3 真的加载了（端口每次启动可能不同，取 `dsh web` 打印的那个）：
+仓库里自带两套不需要宿主、不需要浏览器的检查：
+
+```bash
+npm test          # 纯逻辑冒烟：类型/角色/设置迁移/路径穿越/zip/索引/云端记录
+npm run verify    # 发布物料自检：patch 声明、files 内容、README 图片、screenshots.json、LICENSE
+```
+
+完整回归（需要宿主仿真台 + Playwright）在 `sessions/<会话目录>/harness/`：
+
+```bash
+node run-suites.mjs --cloud <SecretKey.csv>   # 一键跑 15 个套件，每个用例独立进程 + 新夹具
+```
+
+装好之后想确认真机跑的是新版本，可以直接问宿主：
 
 ```bash
 node sessions/<会话目录>/harness/post-restart-check.mjs http://127.0.0.1:<port>

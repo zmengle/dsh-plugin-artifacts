@@ -13,6 +13,8 @@ window.__ModuleLoader__.load({ id: 'dsh-plugin-artifacts', factory: (require) =>
   const API = '/api/dsh-artifacts'
   const PACKAGE = 'dsh-plugin-artifacts'
   const STYLE_ID = 'dsh-plugin-artifacts/styles'
+  /** 首次使用提示条点掉后记这个 key（只存本地，不上报） */
+  const ONBOARD_KEY = 'dsh-artifacts.onboarded'
 
   /** 类型条顺序（与 host 的 util.js 保持一致；`其他` 永远在「更多」里）。 */
   const PRIMARY_KINDS = ['doc', 'sheet', 'slides', 'image', 'video', 'code', 'web']
@@ -243,6 +245,14 @@ window.__ModuleLoader__.load({ id: 'dsh-plugin-artifacts', factory: (require) =>
 /* 整理模式 */
 .ap-curateBtn{gap:5px;height:28px;font-size:12px}
 .ap-notice{display:flex;align-items:flex-start;gap:7px;margin:0 22px 10px;padding:8px 11px;border-radius:9px;border:1px solid color-mix(in srgb,var(--dsw-alias-border-l2) 70%,transparent);background:var(--dsw-alias-bg-layer-2);color:var(--dsw-alias-label-secondary);font-size:11.5px;line-height:1.6}
+/* 首次使用提示条 */.ap-banner{display:flex;align-items:center;gap:8px;margin:0 22px 8px;padding:8px 10px;border-radius:9px;border:1px solid color-mix(in srgb,var(--dsw-alias-brand-primary) 26%,transparent);background:color-mix(in srgb,var(--dsw-alias-brand-primary) 7%,transparent);color:var(--dsw-alias-label-primary);font-size:11.5px;line-height:1.6}
+.ap-bannerText{flex:1 1 auto;min-width:0}
+/* 使用说明 */
+.ap-helpBody{display:flex;flex-direction:column;gap:14px}
+.ap-helpSection h3{margin:0 0 6px;font-size:12px;font-weight:700;color:var(--dsw-alias-label-primary)}
+.ap-helpSection ul{margin:0;padding-left:18px;color:var(--dsw-alias-label-secondary);font-size:12px;line-height:1.75}
+.ap-helpSection code{font-family:ui-monospace,SFMono-Regular,Consolas,monospace}
+.ap-emptyActions{display:flex;gap:8px;flex-wrap:wrap;justify-content:center}
 .ap-curateSearch{padding:8px 16px 0}
 .ap-curateSearch .ap-input{width:100%;height:28px}
 .ap-curateBody{padding:12px 16px;max-height:min(62vh,560px)}
@@ -458,6 +468,7 @@ window.__ModuleLoader__.load({ id: 'dsh-plugin-artifacts', factory: (require) =>
     cloud: () => h(React.Fragment, null, path('M7.5 18.5h9a3.8 3.8 0 0 0 .6-7.55A5.2 5.2 0 0 0 7 9.6a4.5 4.5 0 0 0 .5 8.9Z')),
     refresh: () => h(React.Fragment, null, path('M20 11.5A8 8 0 1 0 18.4 17'), path('M20 5v6h-6')),
     info: () => h(React.Fragment, null, h('circle', { cx: 12, cy: 12, r: 8.5 }), path('M12 11v5.5'), dot(12, 7.8, 1.2)),
+    help: () => h(React.Fragment, null, h('circle', { cx: 12, cy: 12, r: 8.5 }), path('M9.5 9.3a2.6 2.6 0 1 1 3.6 2.4c-.9.4-1.3 1.1-1.3 2'), dot(12, 16.9, 1.1)),
     box: () => h(React.Fragment, null, path('M4 8.2L12 4l8 4.2v7.6L12 20l-8-4.2z'), path('M4 8.2l8 4.3 8-4.3'), path('M12 12.5V20')),
     empty: () => h(React.Fragment, null, path('M4.5 9.5 12 4l7.5 5.5v8L12 20l-7.5-2.5z'), path('M8.5 14.5h7'), path('M9.5 11h5')),
     chevronDown: () => path('M6 9.5l6 6 6-6'),
@@ -512,6 +523,9 @@ window.__ModuleLoader__.load({ id: 'dsh-plugin-artifacts', factory: (require) =>
     trash: { items: [], bytes: 0, retention: '30' },
     settings: { trashRetention: '30', showOthers: false, roots: [], scan: { deliverable: true, memory: true, session: false } },
     settingsOpen: false,
+    helpOpen: false,
+    // 首次使用提示条（用户点掉后写 localStorage，不再出现）
+    firstRun: false,
     status: null,
     cloud: {
       config: null,
@@ -1127,15 +1141,42 @@ window.__ModuleLoader__.load({ id: 'dsh-plugin-artifacts', factory: (require) =>
     const s = useStore()
     const cloudEnabled = s.cloud.config?.enabled === true
     const synced = item.cloud?.state === 'synced'
+    const menuRef = React.useRef(null)
+    // 菜单打开后把焦点放到第一项：这样 ↑/↓ 立刻可用（role=menu 的常规行为）
+    React.useEffect(() => {
+      if (anchor === undefined || anchor === null) return
+      const menu = menuRef.current
+      if (menu === null) return
+      const first = menu.querySelector('.ap-menuItem:not([disabled])')
+      if (first !== null) first.focus()
+    }, [anchor])
     const style = anchor === undefined || anchor === null
       ? { right: 6, top: 34 }
       : { left: anchor.left, top: anchor.top, maxHeight: anchor.maxHeight }
     return h('div', {
       className: 'ap-menu',
       role: 'menu',
+      ref: menuRef,
       style,
       onMouseDown: (event) => event.stopPropagation(),
       onClick: (event) => event.stopPropagation(),
+      // role=menu 就该能用方向键走：↑/↓ 在可点项之间移动，Home/End 跳首尾
+      onKeyDown: (event) => {
+        const items = [...event.currentTarget.querySelectorAll('.ap-menuItem:not([disabled])')]
+        if (items.length === 0) return
+        const current = items.indexOf(document.activeElement)
+        if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+          event.preventDefault()
+          const step = event.key === 'ArrowDown' ? 1 : -1
+          const next = current < 0 ? (step > 0 ? 0 : items.length - 1) : (current + step + items.length) % items.length
+          items[next].focus()
+          return
+        }
+        if (event.key === 'Home' || event.key === 'End') {
+          event.preventDefault()
+          items[event.key === 'Home' ? 0 : items.length - 1].focus()
+        }
+      },
     },
       h('button', {
         type: 'button', role: 'menuitem', className: 'ap-menuItem',
@@ -1525,6 +1566,49 @@ window.__ModuleLoader__.load({ id: 'dsh-plugin-artifacts', factory: (require) =>
           h('button', { type: 'button', className: 'ap-btn ap-btn--primary', onClick: close }, '完成'))))
   }
 
+  /** 使用说明：把 README 里最需要解释的四个概念搬到界面里，省得用户去翻仓库。 */
+  function HelpModal() {
+    const s = useStore()
+    if (s.helpOpen !== true) return null
+    const close = () => setState({ helpOpen: false })
+    const section = (title, lines) => h('section', { className: 'ap-helpSection' },
+      h('h3', null, title),
+      h('ul', null, lines.map((line, index) => h('li', { key: index }, line))))
+
+    return h('div', { className: 'ap-overlay', onMouseDown: (event) => { if (event.target === event.currentTarget) close() } },
+      h('div', { className: 'ap-modal ap-modal--sm', role: 'dialog', 'aria-modal': 'true', 'aria-label': '使用说明' },
+        h('div', { className: 'ap-modalHead' },
+          h('div', { className: 'ap-modalTitles' },
+            h('div', { className: 'ap-modalTitle' }, '这个页面在管什么'),
+            h('div', { className: 'ap-modalSub' }, '四个角色 · 三种扫描 · 云端是可选的')),
+          h('button', { type: 'button', className: 'ap-iconbtn', 'aria-label': '关闭', onClick: close },
+            h(Icon, { size: 15 }, I.close()))),
+        h('div', { className: 'ap-modalBody ap-modalBody--pad ap-helpBody' },
+          section('四个角色（决定默认看不看、备不备份）', [
+            '产物：你要交付的东西，默认视图只显示它，也是默认备份范围。',
+            '过程：测试脚本、截图、夹具。默认收起来；在「设置 → 扫描类型」打开「会话」才会索引。',
+            '记忆：MEMORY / PERSONA / HANDOFF 这类上下文文件，和交付物分开。',
+            '素材：你放进来的输入（参考图、样例数据），不会上传到云端。',
+          ]),
+          section('三种扫描类型', [
+            '产物 + 记忆 默认开启；「会话」默认关闭——它会把会话目录里的脚本和截图也收进来（噪声大）。',
+            '主工作区有 sessions/ 时只扫 sessions/ 与 artifacts/，外加根目录的散文件；其它项目目录要单独「添加工作区」。',
+          ]),
+          section('云端（可选，默认关闭）', [
+            '需要自己填 COS 的桶 / 区域 / 密钥；密钥只写进 DSH 凭据，不落在工作区。',
+            '上传永远手动点。自动同步默认关闭，开启后也只重传「已传过、但本地改过」的文件。',
+            '过程与素材永不上传；备份范围可选「仅产物」或「产物 + 记忆」。',
+          ]),
+          section('快捷键', [
+            '整理模式：J / K 移动，1 / 2 / 3 / 4 设成 产物 / 过程 / 记忆 / 素材。',
+            '菜单与弹层：Esc 关闭；Enter 打开预览。',
+          ])),
+        h('div', { className: 'ap-modalFoot' },
+          h('span', { className: 'ap-hint' }, '完整说明与截图在仓库 README 里。'),
+          h('div', { className: 'ap-spacer' }),
+          h('button', { type: 'button', className: 'ap-btn ap-btn--primary', onClick: close }, '知道了'))))
+  }
+
   function Dialog() {
     const s = useStore()
     const dialog = s.dialog
@@ -1682,6 +1766,10 @@ window.__ModuleLoader__.load({ id: 'dsh-plugin-artifacts', factory: (require) =>
           type: 'button', className: 'ap-btn ap-btn--ghost ap-curateBtn', title: '把文件归到产物/过程/记忆',
           onClick: () => openCurate(),
         }, h(Icon, { size: 13 }, I.box()), '整理'),
+        h('button', {
+          type: 'button', className: 'ap-iconbtn', 'aria-label': '使用说明', title: '使用说明',
+          onClick: () => setState({ helpOpen: true }),
+        }, h(Icon, { size: 15 }, I.help())),
         h('button', {
           type: 'button', className: 'ap-iconbtn', 'aria-label': '设置', title: '设置',
           'aria-expanded': String(s.settingsOpen),
@@ -2018,7 +2106,24 @@ window.__ModuleLoader__.load({ id: 'dsh-plugin-artifacts', factory: (require) =>
               type: 'button', className: 'ap-btn',
               onClick: () => { setState({ q: '', kind: 'all', scope: 'all', role: 'deliverable' }); loadItems(true) },
             }, '清空筛选')
-          : h('button', { type: 'button', className: 'ap-btn', onClick: doRefreshIndex }, '重新扫描'),
+          // 空态给出口，而不是只让用户「再扫一次」：整理模式、添加工作区、看说明
+          : h('div', { className: 'ap-emptyActions' },
+              h('button', { type: 'button', className: 'ap-btn ap-btn--primary', onClick: () => openCurate() }, '打开整理'),
+              h('button', {
+                type: 'button', className: 'ap-btn',
+                onClick: async () => {
+                  const choice = await chooseDirectory()
+                  if (choice.ok !== true) {
+                    if (choice.supported === false) notify('这个环境打不开系统目录选择器', 'info')
+                    return
+                  }
+                  const existing = (s.settings.roots || []).map((entry) => ({ path: entry.path, label: entry.label, primary: entry.primary }))
+                  if (existing.some((entry) => entry.path === choice.dir)) { notify('这个目录已经在列表里了', 'info'); return }
+                  saveSettings({ roots: existing.concat([{ path: choice.dir }]) })
+                },
+              }, h(Icon, { size: 13 }, I.folder()), '添加工作区'),
+              h('button', { type: 'button', className: 'ap-btn ap-btn--ghost', onClick: () => setState({ helpOpen: true }) }, '这是怎么算的？'),
+              h('button', { type: 'button', className: 'ap-btn ap-btn--ghost', onClick: doRefreshIndex }, '重新扫描')),
       })
     }
 
@@ -2057,7 +2162,8 @@ window.__ModuleLoader__.load({ id: 'dsh-plugin-artifacts', factory: (require) =>
         onClick: () => loadItems(false),
       }, s.loadingItems ? '加载中…' : `加载更多（已显示 ${s.items.length}/${s.total}）`) : null,
       selected.size === 0 ? null : h('div', { className: 'ap-selbar', role: 'status' },
-        h('span', { className: 'ap-selCount' }, '已选 ' + selected.size + ' ', h('span', null, '/ ' + s.items.length)),
+        // 分母用总数而不是当前页：否则「已选 3 / 共 48」会让人以为总共只有 48 个
+        h('span', { className: 'ap-selCount' }, '已选 ' + selected.size + ' ', h('span', null, '/ ' + (s.total || s.items.length))),
         cloudMode
           ? h(React.Fragment, null,
               h('button', {
@@ -2390,6 +2496,10 @@ window.__ModuleLoader__.load({ id: 'dsh-plugin-artifacts', factory: (require) =>
     React.useEffect(() => {
       loadStatus()
       loadCloudConfig()
+      // 第一次用（没点过「知道了」）才显示引导条
+      try {
+        if (window.localStorage.getItem(ONBOARD_KEY) !== '1') setState({ firstRun: true })
+      } catch { /* 隐私模式下 localStorage 可能不可用，直接不显示 */ }
     }, [])
 
     // 筛选变化 → 重新取（搜索自己带防抖，不走这里）
@@ -2430,26 +2540,43 @@ window.__ModuleLoader__.load({ id: 'dsh-plugin-artifacts', factory: (require) =>
       }
     }, [s.menuId])
 
-    // 预览 / 对话框 / 整理模式打开时按 Esc 关闭
+    // 预览 / 对话框 / 整理模式 / 帮助打开时按 Esc 关闭
     React.useEffect(() => {
-      if (s.preview === null && s.dialog === null && s.curate.open !== true) return
+      if (s.preview === null && s.dialog === null && s.curate.open !== true && s.helpOpen !== true) return
       const onKey = (event) => {
         if (event.key !== 'Escape') return
+        if (s.helpOpen === true) {
+          setState({ helpOpen: false })
+          return
+        }
         if (s.curate.open === true) {
           setState({ curate: { open: false, loading: false, items: [], total: 0, truncated: false } })
           return
         }
         setState({ preview: null, dialog: null })
       }
-      window.addEventListener('keydown', onKey)
-      return () => window.removeEventListener('keydown', onKey)
-    }, [s.preview, s.dialog, s.curate.open])
+      // 同样用捕获阶段：shell 会吞掉冒泡阶段的 Escape
+      window.addEventListener('keydown', onKey, true)
+      return () => window.removeEventListener('keydown', onKey, true)
+    }, [s.preview, s.dialog, s.curate.open, s.helpOpen])
 
     // 云端 tab 没有云端条目时，类型条只是一排 0，收起来更干净
     const showFilters = s.tab !== 'trash' && !(s.tab === 'cloud' && s.items.length === 0)
 
+    const dismissFirstRun = () => {
+      setState({ firstRun: false })
+      try { window.localStorage.setItem(ONBOARD_KEY, '1') } catch { /* 隐私模式忽略 */ }
+    }
+
     return h('div', { className: 'ap-root', role: 'region', 'aria-label': '我的产物' },
       h(Header),
+      s.firstRun ? h('div', { className: 'ap-banner' },
+        h(Icon, { size: 14 }, I.help()),
+        h('span', { className: 'ap-bannerText' },
+          '默认只显示', h('b', null, '产物'), '；过程（测试脚本、截图）和记忆在顶部切换。点右上角 ? 看完整说明。'),
+        h('button', { type: 'button', className: 'ap-btn ap-btn--ghost ap-btn--sm', onClick: () => setState({ helpOpen: true }) }, '看说明'),
+        h('button', { type: 'button', className: 'ap-iconbtn ap-iconbtn--sm', 'aria-label': '知道了', title: '知道了', onClick: dismissFirstRun },
+          h(Icon, { size: 12 }, I.close()))) : null,
       h(Tabs),
       showFilters ? h(Filters) : null,
       h('div', { className: 'ap-body' },
@@ -2457,6 +2584,7 @@ window.__ModuleLoader__.load({ id: 'dsh-plugin-artifacts', factory: (require) =>
       h(Preview),
       h(Dialog),
       h(CurateModal),
+      h(HelpModal),
       s.toast === null ? null : h('div', {
         className: 'ap-toast',
         'data-kind': s.toast.kind,

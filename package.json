@@ -1,6 +1,6 @@
 {
   "name": "dsh-plugin-artifacts",
-  "version": "2.0.1",
+  "version": "2.1.0",
   "type": "module",
   "description": "我的产物：DSH 侧栏一级入口 + 独立页面。按「产物 / 过程 / 记忆 / 素材」分层整理工作区文件，多工作区、12 类文件类型、按年/月/日分组的时间轴、预览与重命名、回收站与归档，可选的多工作区 COS 手动上传与定时同步。",
   "repository": {

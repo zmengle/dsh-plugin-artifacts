@@ -1,4 +1,4 @@
-﻿window.__ModuleLoader__.load({ id: 'dsh-plugin-artifacts', factory: (require) => {
+window.__ModuleLoader__.load({ id: 'dsh-plugin-artifacts', factory: (require) => {
   'use strict'
 
   // 运行时只依赖 react（平台种子表提供）：不引其它包、不假设构建步骤。
@@ -52,9 +52,15 @@
 .ap-search>svg{position:absolute;left:9px;opacity:.45;pointer-events:none}
 .ap-search input{width:210px;height:30px;box-sizing:border-box;padding:0 28px 0 30px;border-radius:9px;border:1px solid var(--dsw-alias-border-l2);background:var(--dsw-alias-bg-layer-1);color:inherit;font-size:12.5px;font-family:inherit;outline:none;transition:border-color .15s,box-shadow .15s,background .15s}
 .ap-search input::placeholder{color:var(--dsw-alias-label-secondary)}
+.ap-search input::-webkit-search-cancel-button,.ap-search input::-webkit-search-decoration{-webkit-appearance:none;display:none}
 .ap-search input:focus{border-color:var(--dsw-alias-brand-primary);box-shadow:0 0 0 3px color-mix(in srgb,var(--dsw-alias-brand-primary) 15%,transparent)}
 .ap-search-clear{position:absolute;right:6px;width:18px;height:18px;display:flex;align-items:center;justify-content:center;border:0;padding:0;border-radius:50%;background:transparent;color:var(--dsw-alias-label-secondary);cursor:pointer;font-size:11px;line-height:1}
 .ap-search-clear:hover{background:var(--dsw-alias-bg-layer-2);color:var(--dsw-alias-label-primary)}
+.ap-suggest{position:absolute;left:0;right:0;top:34px;z-index:6;display:flex;flex-direction:column;padding:4px;border-radius:9px;border:1px solid var(--dsw-alias-border-l1);background:var(--dsw-alias-bg-overlay,var(--dsw-alias-bg-layer-1));box-shadow:0 10px 28px -12px rgba(0,0,0,.45)}
+.ap-suggestItem{display:flex;align-items:center;gap:6px;width:100%;padding:6px 8px;border:0;border-radius:6px;background:transparent;color:var(--dsw-alias-label-primary);font-size:12px;font-family:inherit;text-align:left;cursor:pointer}
+.ap-suggestItem[data-active="true"]{background:var(--dsw-alias-bg-layer-2)}
+.ap-suggestItem b{color:var(--dsw-alias-brand-primary);font-weight:600}
+.ap-suggestHint{margin-left:auto;color:var(--dsw-alias-label-secondary);font-size:11px}
 .ap-iconbtn{width:30px;height:30px;display:inline-flex;align-items:center;justify-content:center;padding:0;border-radius:9px;border:1px solid var(--dsw-alias-border-l2);background:var(--dsw-alias-bg-layer-1);color:var(--dsw-alias-label-secondary);cursor:pointer;transition:background .15s,color .15s,border-color .15s}
 .ap-iconbtn:hover{background:var(--dsw-alias-bg-layer-2);color:var(--dsw-alias-label-primary)}
 .ap-iconbtn:focus-visible{outline:2px solid var(--dsw-alias-brand-primary);outline-offset:2px}
@@ -97,6 +103,7 @@
 .ap-card:hover{border-color:var(--dsw-alias-border-l2);box-shadow:0 8px 22px -12px rgba(0,0,0,.4)}
 .ap-card[data-selected="true"]{border-color:var(--dsw-alias-brand-primary);box-shadow:0 0 0 1px var(--dsw-alias-brand-primary)}
 .ap-thumb{position:relative;aspect-ratio:16/10;border-radius:10px 10px 0 0;overflow:hidden;display:flex;align-items:center;justify-content:center;background:color-mix(in srgb,var(--ap-hue,var(--dsw-alias-label-secondary)) 6%,var(--dsw-alias-bg-layer-2));border-bottom:1px solid var(--dsw-alias-border-l1);color:var(--dsw-alias-label-secondary);cursor:zoom-in;border:0;padding:0;width:100%;font-family:inherit;flex:none}
+.ap-rowMain:focus-visible{outline:2px solid var(--dsw-alias-brand-primary);outline-offset:-2px;border-radius:7px}
 .ap-thumb:focus-visible{outline:2px solid var(--dsw-alias-brand-primary);outline-offset:-2px}
 .ap-thumb img{width:100%;height:100%;object-fit:cover;display:block;transition:transform .25s cubic-bezier(.2,.8,.2,1)}
 .ap-thumb:hover img{transform:scale(1.03)}
@@ -218,7 +225,12 @@
 .ap-modalBody::-webkit-scrollbar-thumb{background:var(--dsw-alias-border-l2);border:3px solid transparent;border-radius:8px;background-clip:content-box}
 .ap-modalBody--pad{padding:16px}
 .ap-pre{margin:0;padding:14px 16px;font-family:ui-monospace,SFMono-Regular,Consolas,"Courier New",monospace;font-size:12px;line-height:1.72;white-space:pre-wrap;word-break:break-word;color:var(--dsw-alias-label-primary);tab-size:2}
-.ap-imgWrap{display:flex;align-items:center;justify-content:center;padding:18px;background-image:linear-gradient(45deg,var(--dsw-alias-bg-layer-2) 25%,transparent 25%,transparent 75%,var(--dsw-alias-bg-layer-2) 75%),linear-gradient(45deg,var(--dsw-alias-bg-layer-2) 25%,transparent 25%,transparent 75%,var(--dsw-alias-bg-layer-2) 75%);background-size:18px 18px;background-position:0 0,9px 9px}
+.ap-imgWrap{position:relative;display:flex;align-items:center;justify-content:center;padding:18px;min-height:200px;background-image:linear-gradient(45deg,var(--dsw-alias-bg-layer-2) 25%,transparent 25%,transparent 75%,var(--dsw-alias-bg-layer-2) 75%),linear-gradient(45deg,var(--dsw-alias-bg-layer-2) 25%,transparent 25%,transparent 75%,var(--dsw-alias-bg-layer-2) 75%);background-size:18px 18px;background-position:0 0,9px 9px}
+.ap-imgWrap[data-zoom="1"],.ap-imgWrap[data-zoom="2"]{align-items:flex-start;justify-content:flex-start;overflow:auto;max-height:min(64vh,620px)}
+.ap-imgWrap[data-zoom="1"] img{max-width:none;max-height:none}
+.ap-imgWrap[data-zoom="2"] img{max-width:none;max-height:none;width:200%}
+.ap-zoomBar{position:absolute;right:14px;bottom:14px;display:flex;gap:6px;padding:6px;border-radius:9px;background:color-mix(in srgb,var(--dsw-alias-bg-layer-1) 92%,transparent);border:1px solid var(--dsw-alias-border-l1);backdrop-filter:blur(6px)}
+.ap-zoomBar .ap-btn[data-active="true"]{border-color:var(--dsw-alias-brand-primary);color:var(--dsw-alias-brand-primary)}
 .ap-imgWrap img{max-width:100%;max-height:56vh;display:block;border-radius:6px;box-shadow:0 6px 24px -10px rgba(0,0,0,.4);animation:apFade .22s ease-out}
 .ap-binary{display:flex;flex-direction:column;align-items:center;gap:10px;padding:44px 24px;text-align:center;color:var(--dsw-alias-label-secondary)}
 .ap-modalFoot{flex:none;display:flex;align-items:center;gap:8px;padding:10px 16px;border-top:1px solid var(--dsw-alias-border-l1);flex-wrap:wrap}
@@ -1246,13 +1258,24 @@
         className: 'ap-thumb',
         role: 'button',
         tabIndex: 0,
-        'aria-label': '预览 ' + item.name,
+        'aria-label': item.name,
         title: '点击预览',
         onClick: () => openPreview(item),
         onKeyDown: (event) => {
           if (event.key === 'Enter' || event.key === ' ') {
             event.preventDefault()
             openPreview(item)
+            return
+          }
+          // 键盘用户不用去摸鼠标：x 选中、Delete 走删除确认
+          if (event.key === 'x' || event.key === 'X') {
+            event.preventDefault()
+            toggleSelected(item.id)
+            return
+          }
+          if (event.key === 'Delete') {
+            event.preventDefault()
+            confirmDelete([item])
           }
         },
       },
@@ -1298,7 +1321,29 @@
       }, selected ? h(Icon, { size: 12, strokeWidth: 2.4 }, I.check()) : null),
       h('div', { className: 'ap-rowGlyph', onDoubleClick: () => openPreview(item) },
         isImage ? h('img', { src: item.thumb, alt: '', loading: 'lazy' }) : h(KindGlyph, { kind: item.kind, size: 17 })),
-      h('div', { className: 'ap-rowMain', onDoubleClick: () => openPreview(item) },
+      h('div', {
+        className: 'ap-rowMain',
+        role: 'button',
+        tabIndex: 0,
+        'aria-label': item.name,
+        onDoubleClick: () => openPreview(item),
+        onKeyDown: (event) => {
+          if (event.key === 'Enter' || event.key === ' ') {
+            event.preventDefault()
+            openPreview(item)
+            return
+          }
+          if (event.key === 'x' || event.key === 'X') {
+            event.preventDefault()
+            toggleSelected(item.id)
+            return
+          }
+          if (event.key === 'Delete') {
+            event.preventDefault()
+            confirmDelete([item])
+          }
+        },
+      },
         h('div', { className: 'ap-rowName', title: item.name }, displayName(item)),
         h('div', { className: 'ap-rowSub', title: pathLabel(item) + '/' + item.name },
           pathLabel(item) + ' / ' + item.name,
@@ -1327,6 +1372,9 @@
     const s = useStore()
     const preview = s.preview
     const close = () => setState({ preview: null })
+    // 图片缩放：fit（适应窗口）/ 1（原尺寸）/ 2（放大一倍）
+    const [zoom, setZoom] = React.useState('fit')
+    React.useEffect(() => { setZoom('fit') }, [preview?.item?.id])
     React.useEffect(() => {
       const onKey = (event) => {
         if (event.key === 'Escape') {
@@ -1351,7 +1399,27 @@
         h('div', { className: 'ap-emptyTitle' }, '预览失败'),
         h('div', { className: 'ap-emptyDesc' }, preview.error))
     } else if (isImage) {
-      body = h('div', { className: 'ap-imgWrap' }, h('img', { src: API + '/raw?id=' + encodeURIComponent(item.id), alt: item.title || item.name }))
+      const rawUrl = API + '/raw?id=' + encodeURIComponent(item.id)
+      body = h('div', { className: 'ap-imgWrap', 'data-zoom': zoom },
+        h('img', {
+          src: rawUrl,
+          alt: item.title || item.name,
+          title: zoom === 'fit' ? '点击按原尺寸查看' : '点击回到适应窗口',
+          onClick: () => setZoom(zoom === 'fit' ? '1' : 'fit'),
+        }),
+        h('div', { className: 'ap-zoomBar' },
+          ['fit', '1', '2'].map((mode) => h('button', {
+            key: mode, type: 'button',
+            className: 'ap-btn ap-btn--ghost ap-btn--sm',
+            'data-active': String(zoom === mode),
+            'aria-pressed': String(zoom === mode),
+            onClick: () => setZoom(mode),
+          }, mode === 'fit' ? '适应窗口' : mode === '1' ? '原尺寸' : '200%')),
+          h('a', {
+            className: 'ap-btn ap-btn--ghost ap-btn--sm',
+            href: rawUrl, target: '_blank', rel: 'noreferrer',
+            title: '在新标签页打开原图',
+          }, '新标签打开')))
     } else if (data !== null && data.binary === false) {
       body = h('pre', { className: 'ap-pre' }, data.content + (data.truncated ? '\n\n…（已截断，只显示前 256 KB）' : ''))
     } else {
@@ -1714,6 +1782,31 @@
   function Header() {
     const s = useStore()
     const settingsRef = React.useRef(null)
+    const searchRef = React.useRef(null)
+    const [suggestIndex, setSuggestIndex] = React.useState(0)
+    // 搜索语法补全：打到 `type:` / `role:` / `session:` 时给候选，省得记语法
+    const suggestions = (() => {
+      const match = /(?:^|\s)(type|role|session):([^\s]*)$/.exec(s.q)
+      if (match === null) return []
+      const [, key, partial] = match
+      const lower = partial.toLowerCase()
+      const pool = key === 'type'
+        ? Object.keys(KIND_LABEL)
+        : key === 'role'
+          ? ['deliverable', 'scratch', 'memory', 'asset', 'all']
+          : [...new Set(s.items.map((item) => item.sessionTitle || item.session || '').filter((name) => name !== ''))]
+      return pool
+        .filter((value) => value.toLowerCase().startsWith(lower))
+        .slice(0, 8)
+        .map((value) => ({ key, value, label: key === 'type' ? (KIND_LABEL[value] || value) : key === 'role' ? (ROLE_LABEL[value] || value) : value }))
+    })()
+    const applySuggestion = (suggestion) => {
+      const next = s.q.replace(/(type|role|session):([^\s]*)$/, `${suggestion.key}:${suggestion.value} `)
+      setState({ q: next })
+      setSuggestIndex(0)
+      loadItems(true)
+      searchRef.current?.focus()
+    }
 
     React.useEffect(() => {
       if (!s.settingsOpen) return
@@ -1737,22 +1830,49 @@
         h('div', { className: 'ap-search' },
           h(Icon, { size: 13 }, I.search()),
           h('input', {
+            ref: searchRef,
             type: 'search',
             value: s.q,
             placeholder: '搜索文件… 支持 type:code / role:scratch',
             'aria-label': '搜索文件',
             title: '支持 type:doc,image / role:memory / session:<目录名>，可与关键词混用',
             spellCheck: false,
+            role: 'combobox',
+            'aria-autocomplete': 'list',
+            'aria-expanded': String(suggestions.length > 0),
             onChange: (event) => {
               const q = event.target.value
               setState({ q })
+              setSuggestIndex(0)
               if (searchTimer) clearTimeout(searchTimer)
               searchTimer = setTimeout(() => loadItems(true), 260)
             },
             onKeyDown: (event) => {
-              if (event.key === 'Escape') { setState({ q: '' }); loadItems(true) }
+              if (event.key === 'Escape') { setState({ q: '' }); loadItems(true); return }
+              if (suggestions.length === 0) return
+              if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+                event.preventDefault()
+                const step = event.key === 'ArrowDown' ? 1 : -1
+                setSuggestIndex((index) => (index + step + suggestions.length) % suggestions.length)
+                return
+              }
+              if (event.key === 'Tab' || event.key === 'Enter') {
+                event.preventDefault()
+                const picked = suggestions[Math.min(suggestIndex, suggestions.length - 1)]
+                if (picked !== undefined) applySuggestion(picked)
+              }
             },
           }),
+          suggestions.length === 0 ? null : h('div', { className: 'ap-suggest', role: 'listbox' },
+            suggestions.map((suggestion, index) => h('button', {
+              key: suggestion.key + ':' + suggestion.value,
+              type: 'button', role: 'option',
+              'aria-selected': String(index === suggestIndex),
+              'data-active': String(index === suggestIndex),
+              className: 'ap-suggestItem',
+              onMouseDown: (event) => { event.preventDefault(); applySuggestion(suggestion) },
+            }, h('b', null, suggestion.key + ':'), suggestion.label,
+              suggestion.label !== suggestion.value ? h('span', { className: 'ap-suggestHint' }, suggestion.value) : null))),
           s.q === '' ? null : h('button', {
             type: 'button', className: 'ap-search-clear', 'aria-label': '清除搜索', title: '清除搜索',
             onClick: () => { setState({ q: '' }); loadItems(true) },
@@ -2131,9 +2251,33 @@
     const timeSort = s.sort === 'mtime' || s.sort === 'created'
     const granularity = timeSort ? s.group : 'none'
     const stampOf = (item) => (s.sort === 'created' ? (item.born ?? item.mtime) : item.mtime)
+    // 键盘：方向键在卡片/行之间移动焦点（缩略图本身可 Tab 聚焦，Enter 预览，x 选择，Delete 删除）
+    const moveFocus = (event, selector) => {
+      const keys = ['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Home', 'End']
+      if (!keys.includes(event.key)) return false
+      const nodes = [...event.currentTarget.querySelectorAll(selector)]
+      if (nodes.length === 0) return false
+      const current = nodes.indexOf(document.activeElement)
+      event.preventDefault()
+      const last = nodes.length - 1
+      const next = event.key === 'Home' ? 0
+        : event.key === 'End' ? last
+          : current < 0 ? 0
+            : event.key === 'ArrowRight' || event.key === 'ArrowDown'
+              ? (current + 1) % nodes.length
+              : (current - 1 + nodes.length) % nodes.length
+      nodes[next].focus()
+      return true
+    }
     const renderList = (list) => (s.view === 'grid'
-      ? h('div', { className: 'ap-grid' }, list.map((item) => h(Card, { key: item.id, item })))
-      : h('div', { className: 'ap-list' }, list.map((item) => h(Row, { key: item.id, item }))))
+      ? h('div', {
+          className: 'ap-grid',
+          onKeyDown: (event) => moveFocus(event, '.ap-thumb'),
+        }, list.map((item) => h(Card, { key: item.id, item })))
+      : h('div', {
+          className: 'ap-list',
+          onKeyDown: (event) => moveFocus(event, '.ap-rowMain'),
+        }, list.map((item) => h(Row, { key: item.id, item }))))
 
     let view
     if (granularity === 'none') {
@@ -2508,19 +2652,21 @@
       loadItems(true)
     }, [s.tab, s.role, s.kind, s.scope, s.root, s.sort, s.order])
 
-    // 页面开着时每 8 秒静默对齐一次：别的会话刚写完文件，这里不用手动刷新就能看到
+    // 页面开着时静默对齐一次：别的会话刚写完文件，这里不用手动刷新就能看到。
+    // 条目多的时候把间隔拉长——8000 条的工作区每 8 秒全树走一遍是浪费。
     React.useEffect(() => {
       if (s.tab !== 'local') return
+      const interval = (s.total ?? 0) > 2000 ? 30000 : 8000
       const tick = () => {
         if (document.visibilityState === 'visible') reloadQuiet()
       }
-      const timer = setInterval(tick, 8000)
+      const timer = setInterval(tick, interval)
       document.addEventListener('visibilitychange', tick)
       return () => {
         clearInterval(timer)
         document.removeEventListener('visibilitychange', tick)
       }
-    }, [s.tab])
+    }, [s.tab, s.total > 2000])
 
     // 菜单点击外部 / 按 Esc 关闭
     React.useEffect(() => {

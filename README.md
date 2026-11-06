@@ -1,4 +1,4 @@
-﻿# dsh-plugin-artifacts · 我的产物
+# dsh-plugin-artifacts · 我的产物
 
 > **English (TL;DR)** — A sidebar-first artifact manager for DSH. It separates what you actually *delivered* from
 > the noise around it: every file is classified as **product / scratch / memory / asset**, so the default view is
@@ -13,16 +13,18 @@ DSH 的**侧栏一级入口 + 独立页面**，把工作区里的产物集中管
 默认只看产物；过程文件（测试脚本、截图、夹具）要你在顶部切过去才出现。
 
 - 网格 / 列表、12 类文件类型、按来源与角色筛、按 创建/修改 时间排序并按 年·月·日 分组
-- 预览、重命名、移动、回收站、zip 归档、整理模式（规则自动判 + 人工覆盖）
+- 预览（图片可 适应/原尺寸/200% 缩放，可新标签打开原图）、重命名、移动、回收站、zip 归档
+- 整理模式（规则自动判 + 人工覆盖 + 筛选框）、搜索语法补全（`type:` / `role:` / `session:`）
+- 键盘可用：卡片可 Tab 聚焦，`Enter` 预览、`x` 选中、`Delete` 删除、方向键在卡片间移动
 - 多工作区（最多 8 个根）、可选 COS 云端（手动上传 / 定时只重传改过的文件 / 孤儿记录可清）
 
 **要求**：DSH ≥ 2.0.0（实测 2.0.21-next；用到了 `sidebar.panellist` 与 `main` keyed slot）；Node ≥ 20；零运行时依赖。
 
 ![浅色 · 网格](https://raw.githubusercontent.com/zmengle/dsh-plugin-artifacts/main/docs/grid-light.png)
 
-| 深色 | 按月分组 | 整理模式 | 云端（已同步） | 预览（含本地路径） | 卡片菜单 |
+| 按月分组 | 搜索补全 | 图片缩放 | 整理模式 | 云端（已同步） | 使用说明 |
 |---|---|---|---|---|---|
-| ![深色](https://raw.githubusercontent.com/zmengle/dsh-plugin-artifacts/main/docs/grid-dark.png) | ![按月分组](https://raw.githubusercontent.com/zmengle/dsh-plugin-artifacts/main/docs/group-month.png) | ![整理模式](https://raw.githubusercontent.com/zmengle/dsh-plugin-artifacts/main/docs/curate-search.png) | ![云端已同步](https://raw.githubusercontent.com/zmengle/dsh-plugin-artifacts/main/docs/cloud-synced.png) | ![预览](https://raw.githubusercontent.com/zmengle/dsh-plugin-artifacts/main/docs/preview.png) | ![菜单](https://raw.githubusercontent.com/zmengle/dsh-plugin-artifacts/main/docs/menu.png) |
+| ![按月分组](https://raw.githubusercontent.com/zmengle/dsh-plugin-artifacts/main/docs/group-month.png) | ![搜索补全](https://raw.githubusercontent.com/zmengle/dsh-plugin-artifacts/main/docs/suggest.png) | ![图片缩放](https://raw.githubusercontent.com/zmengle/dsh-plugin-artifacts/main/docs/zoom.png) | ![整理模式](https://raw.githubusercontent.com/zmengle/dsh-plugin-artifacts/main/docs/curate-search.png) | ![云端已同步](https://raw.githubusercontent.com/zmengle/dsh-plugin-artifacts/main/docs/cloud-synced.png) | ![使用说明](https://raw.githubusercontent.com/zmengle/dsh-plugin-artifacts/main/docs/help.png) |
 
 > 设计基线：[`plugin-design-v3-artifact-model.md`](https://github.com/zmengle/dsh-plugin-artifacts/blob/main/docs/design-v3.md)（角色 × 类型模型）。
 

@@ -14,6 +14,12 @@ const check = (name, condition, detail) => {
   else problems.push(name + (detail === undefined ? '' : ' :: ' + detail))
 }
 
+// ---- 编码：Windows 上被编辑器写成 UTF-8 BOM 的话，Node 的 JSON.parse 会直接崩
+const pkgBytes = readFileSync(join(ROOT, 'package.json'))
+check('package.json 没有 BOM', !(pkgBytes[0] === 0xef && pkgBytes[1] === 0xbb && pkgBytes[2] === 0xbf))
+const clientBytes = readFileSync(join(ROOT, 'client.js'))
+check('client.js 没有 BOM', !(clientBytes[0] === 0xef && clientBytes[1] === 0xbb && clientBytes[2] === 0xbf))
+
 const pkg = JSON.parse(readFileSync(join(ROOT, 'package.json'), 'utf8'))
 const readme = readFileSync(join(ROOT, 'README.md'), 'utf8')
 

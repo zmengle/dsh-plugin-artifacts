@@ -12,6 +12,8 @@
 - 发布前自检补上这一项：`npm run verify` 现在会用 `2.0.21-next` 试算 `engines.dsh`，写错直接失败。
 - `prepublishOnly` 挂上 `verify + test`，以后 `npm publish` 不会跳过检查。
 - 新增 GitHub Actions（Node 20 / 22 分别跑 `npm test` 和 `npm run verify`）。
+- **云端「孤儿记录」判定更准**：文件还在、只是当前扫描类型没收录（比如截图被规则判成过程）不再算孤儿，
+  改记 `hidden`，提示文案也说清是「不在扫描范围」而不是「文件已不在」。否则点「清理记录」时用户会以为文件丢了。
 
 ## 2.0.0 — 2026-11-06
 

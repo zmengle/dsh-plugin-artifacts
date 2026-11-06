@@ -1,11 +1,11 @@
-# dsh-plugin-artifacts · 我的产物
+﻿# dsh-plugin-artifacts · 我的产物
 
 > **English (TL;DR)** — A sidebar-first artifact manager for DSH. It separates what you actually *delivered* from
 > the noise around it: every file is classified as **product / scratch / memory / asset**, so the default view is
 > just your deliverables. Grid & list, 12 file types, time axis with year/month/day grouping, preview, rename,
 > trash with restore, zip archive, multi-workspace roots, and optional manual sync to Tencent COS
 > (off by default — no background uploads unless you turn it on).
-> Requires DSH ≥ 2.0.21 (`sidebar.panellist` + `main` slots). Zero runtime dependencies.
+> Requires DSH ≥ 2.0.0 (`sidebar.panellist` + `main` slots; tested on 2.0.21-next). Zero runtime dependencies.
 
 DSH 的**侧栏一级入口 + 独立页面**，把工作区里的产物集中管起来：会话里生成的文件、`artifacts/` 里的共享素材。
 
@@ -16,7 +16,7 @@ DSH 的**侧栏一级入口 + 独立页面**，把工作区里的产物集中管
 - 预览、重命名、移动、回收站、zip 归档、整理模式（规则自动判 + 人工覆盖）
 - 多工作区（最多 8 个根）、可选 COS 云端（手动上传 / 定时只重传改过的文件 / 孤儿记录可清）
 
-**要求**：DSH ≥ 2.0.21（用到了 `sidebar.panellist` 与 `main` keyed slot）；Node ≥ 20；零运行时依赖。
+**要求**：DSH ≥ 2.0.0（实测 2.0.21-next；用到了 `sidebar.panellist` 与 `main` keyed slot）；Node ≥ 20；零运行时依赖。
 
 ![浅色 · 网格](https://raw.githubusercontent.com/zmengle/dsh-plugin-artifacts/main/docs/grid-light.png)
 

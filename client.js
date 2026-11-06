@@ -1,4 +1,4 @@
-window.__ModuleLoader__.load({ id: 'dsh-plugin-artifacts', factory: (require) => {
+﻿window.__ModuleLoader__.load({ id: 'dsh-plugin-artifacts', factory: (require) => {
   'use strict'
 
   // 运行时只依赖 react（平台种子表提供）：不引其它包、不假设构建步骤。
@@ -2435,7 +2435,7 @@ window.__ModuleLoader__.load({ id: 'dsh-plugin-artifacts', factory: (require) =>
     // 有云端记录、但对应文件不在当前扫描范围（多为「过程」文件）时，说明一下，
     // 否则「云端 N」和列表对不上会让人以为数据丢了
     const orphanCloud = s.status?.cloud?.orphans ?? 0
-    const hiddenCloud = Math.max(0, (s.status?.cloud?.recordedTotal ?? 0) - (s.status?.cloud?.uploaded ?? 0) - orphanCloud)
+    const hiddenCloud = s.status?.cloud?.hidden ?? Math.max(0, (s.status?.cloud?.recordedTotal ?? 0) - (s.status?.cloud?.uploaded ?? 0) - orphanCloud)
     return h(React.Fragment, null,
       configOpen
         ? h(CloudConfigForm, { onCollapse: () => setState({ cloud: Object.assign({}, s.cloud, { configOpen: false }) }) })
@@ -2449,7 +2449,7 @@ window.__ModuleLoader__.load({ id: 'dsh-plugin-artifacts', factory: (require) =>
       orphanCloud > 0
         ? h('div', { className: 'ap-notice' },
             h(Icon, { size: 13 }, I.info()),
-            h('span', null, '有 ', String(orphanCloud), ' 条云端记录对应的本地文件已不在（删除或移出扫描范围），记录还在。'),
+            h('span', null, '有 ', String(orphanCloud), ' 条云端记录对应的本地文件已不在（删除或移出工作区），记录还在。'),
             h('button', {
               type: 'button', className: 'ap-btn ap-btn--ghost ap-btn--sm',
               onClick: () => purgeOrphans(),

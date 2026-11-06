@@ -1,4 +1,4 @@
-﻿/**
+/**
  * dsh-plugin-artifacts — 「我的产物」· Host 半侧
  *
  * 一个侧栏一级入口 + 一个独立页面（Client 半侧），背后是这一层：
@@ -364,9 +364,20 @@ export function apply(ctx, passedConfig) {
         // 数字按「当前索引里能看到的」算：被扫成过程而没收录的，不该让「云端 4」对着空列表
         const visible = new Set(indexer.all().map((item) => item.id))
         const recorded = cloud.recordedIds().filter((id) => visible.has(id))
-        // 有记录但文件已经不在了（删除/挪走）—— 单独报出来，让用户能清
-        const orphans = cloud.orphanIds(visible)
-        return { ...summary, uploaded: recorded.length, recordedTotal: summary.uploaded, orphans: orphans.length }
+        // 记录有、但索引里没有：再分两种——文件还在（只是扫描类型没收录）vs 真的没了
+        const missing = cloud.orphanIds(visible)
+        const orphans = missing.filter((id) => {
+          const abs = indexer.resolveId(id)
+          return abs === null || !existsSync(abs)
+        })
+        const hidden = missing.length - orphans.length
+        return {
+          ...summary,
+          uploaded: recorded.length,
+          recordedTotal: summary.uploaded,
+          orphans: orphans.length,
+          hidden,
+        }
       })(),
       settings: conf,
       roles: roles.stat(),
@@ -747,7 +758,11 @@ export function apply(ctx, passedConfig) {
   async function orphansEndpoint(method, body) {
     const { cloud, indexer } = ensureStores()
     const visible = new Set(indexer.all().map((item) => item.id))
-    const ids = cloud.orphanIds(visible)
+    // 只算「文件真的不在了」的；文件还在、只是扫描类型没收录的（hidden）留给状态里单独说明
+    const ids = cloud.orphanIds(visible).filter((id) => {
+      const abs = indexer.resolveId(id)
+      return abs === null || !existsSync(abs)
+    })
     if (method === 'GET') {
       return { ids, items: ids.map((id) => ({ id, key: cloud.recordedKeyOf({ id }) ?? '' })) }
     }
@@ -757,7 +772,7 @@ export function apply(ctx, passedConfig) {
       cloud.forget(id)
       removed += 1
     }
-    return { removed, remaining: cloud.orphanIds(visible).length }
+    return { removed, remaining: ids.filter((id) => cloud.recordedKeyOf({ id }) !== undefined).length }
   }
 
   /**

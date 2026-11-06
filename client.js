@@ -139,6 +139,10 @@
 .ap-menuItem[disabled]{opacity:.4;cursor:not-allowed}
 .ap-menuSep{height:1px;margin:4px 6px;background:var(--dsw-alias-border-l1)}
 .ap-list{display:flex;flex-direction:column;padding-top:10px}
+/* 时间分组（年/月/日）：标题吸顶，滚动时知道自己在哪一段 */.ap-group{margin-bottom:4px}
+.ap-groupHead{position:sticky;top:0;z-index:3;display:flex;align-items:baseline;gap:8px;padding:8px 2px 6px;margin-bottom:2px;background:color-mix(in srgb,var(--dsw-alias-bg-base) 88%,transparent);backdrop-filter:blur(8px)}
+.ap-groupTitle{font-size:13px;font-weight:700;color:var(--dsw-alias-label-primary)}
+.ap-groupCount{font-size:11px;color:var(--dsw-alias-label-secondary)}
 .ap-row{display:flex;align-items:center;gap:11px;padding:8px 10px;border-radius:9px;border:1px solid transparent;cursor:default}
 .ap-row:hover{background:var(--dsw-alias-bg-layer-1);border-color:var(--dsw-alias-border-l1)}
 .ap-row[data-selected="true"]{background:color-mix(in srgb,var(--dsw-alias-brand-primary) 8%,transparent);border-color:color-mix(in srgb,var(--dsw-alias-brand-primary) 30%,transparent)}
@@ -327,8 +331,37 @@
     return date.getFullYear() === now.getFullYear() ? base : date.getFullYear() + '-' + base
   }
 
-  function relTime(ms) {
-    const delta = Date.now() - Number(ms)
+  /**
+   * 时间分组（像手机相册）：年 / 月 / 日。
+   * key 用 `YYYY`、`YYYY-MM`、`YYYY-MM-DD`，既能排序也能直接比较。
+   */
+  function groupKeyOf(ms, granularity) {
+    const value = Number(ms)
+    if (!Number.isFinite(value) || value <= 0) return 'unknown'
+    const date = new Date(value)
+    const year = date.getFullYear()
+    if (granularity === 'year') return String(year)
+    const month = pad2(date.getMonth() + 1)
+    if (granularity === 'month') return `${year}-${month}`
+    return `${year}-${month}-${pad2(date.getDate())}`
+  }
+
+  /** 分组标题：今天 / 昨天 / 11月5日 / 2026年11月 / 2026年。 */
+  function groupLabelOf(key, granularity) {
+    if (key === 'unknown') return '时间未知'
+    const [year, month, day] = key.split('-')
+    if (granularity === 'year') return `${year}年`
+    if (granularity === 'month') return `${year}年${Number(month)}月`
+    const now = new Date()
+    const todayKey = groupKeyOf(now.getTime(), 'day')
+    const yesterdayKey = groupKeyOf(now.getTime() - 86_400_000, 'day')
+    if (key === todayKey) return '今天'
+    if (key === yesterdayKey) return '昨天'
+    if (Number(year) === now.getFullYear()) return `${Number(month)}月${Number(day)}日`
+    return `${year}年${Number(month)}月${Number(day)}日`
+  }
+
+  function relTime(ms) {    const delta = Date.now() - Number(ms)
     if (!Number.isFinite(delta)) return '—'
     if (delta < 60_000) return '刚刚'
     if (delta < 3_600_000) return Math.floor(delta / 60_000) + ' 分钟前'
@@ -460,7 +493,8 @@
     moreOpen: false,
     scope: 'all',              // all | session | shared
     root: 'all',               // all | primary | @label
-    sort: 'mtime',             // mtime | name | size
+    sort: 'mtime',             // mtime | created | name | size
+    group: 'month',            // none | year | month | day —— 只对时间排序生效
     order: 'desc',
     view: 'grid',              // grid | list
     q: '',
@@ -555,6 +589,8 @@
   const MENU_WIDTH = 188
   /** 菜单大概有多高：9 项 × 29 + 内边距 + 两条分隔线。 */
   const MENU_ESTIMATE = 340
+  /** 再挤也要留这么多高度：否则最后一项会被裁掉半截（宁可与按钮重叠一点）。 */
+  const MENU_MIN_HEIGHT = 240
 
   /**
    * 菜单不放在卡片里，而是用 fixed 坐标贴着 ⋯ 按钮画：
@@ -570,7 +606,7 @@
     const spaceBelow = window.innerHeight - rect.bottom - margin
     const spaceAbove = rect.top - margin
     const openUp = spaceBelow < MENU_ESTIMATE && spaceAbove > spaceBelow
-    const maxHeight = Math.max(160, Math.min(MENU_ESTIMATE, openUp ? spaceAbove - 6 : spaceBelow - 6))
+    const maxHeight = Math.max(MENU_MIN_HEIGHT, Math.min(MENU_ESTIMATE, openUp ? spaceAbove - 6 : spaceBelow - 6))
     const top = openUp
       ? Math.max(margin, rect.top - Math.min(maxHeight, spaceAbove) - 6)
       : rect.bottom + 6
@@ -1092,17 +1128,21 @@
         onClick: () => { onClose(); setState({ dialog: { type: 'rename', item, value: item.name } }) },
       }, h(Icon, { size: 13 }, I.rename()), '重命名'),
       h('div', { className: 'ap-menuSep' }),
-      synced
+      // 云端动作按状态只留一个：冲突时「拉回云端那份」，没传过才「上传」，已同步就没什么可做的
+      item.cloud?.state === 'conflict'
         ? h('button', {
             type: 'button', role: 'menuitem', className: 'ap-menuItem',
+            title: '本地改过了，把云端那份拉回来（会另存一份，不覆盖本地）',
             onClick: () => { onClose(); downloadCloud([item]) },
-          }, h(Icon, { size: 13 }, I.remote()), s.cloud.config?.downloadDir ? '从云端下载' : '从云端下载…')
-        : h('button', {
-            type: 'button', role: 'menuitem', className: 'ap-menuItem',
-            disabled: !cloudEnabled,
-            title: cloudEnabled ? '' : '云端未配置',
-            onClick: () => { onClose(); uploadCloud([item]) },
-          }, h(Icon, { size: 13 }, I.cloud()), '上传到云端'),
+          }, h(Icon, { size: 13 }, I.remote()), '从云端下载')
+        : synced
+          ? null
+          : h('button', {
+              type: 'button', role: 'menuitem', className: 'ap-menuItem',
+              disabled: !cloudEnabled,
+              title: cloudEnabled ? '' : '云端未配置',
+              onClick: () => { onClose(); uploadCloud([item]) },
+            }, h(Icon, { size: 13 }, I.cloud()), '上传到云端'),
       synced && s.cloud.config?.allowRemoteDelete === true
         ? h('button', {
             type: 'button', role: 'menuitem', className: 'ap-menuItem', 'data-danger': 'true',
@@ -1119,16 +1159,6 @@
         type: 'button', role: 'menuitem', className: 'ap-menuItem',
         onClick: () => { onClose(); cleanSession(item) },
       }, h(Icon, { size: 13 }, I.trash()), '清理原目录') : null,
-      h('button', {
-        type: 'button', role: 'menuitem', className: 'ap-menuItem',
-        onClick: () => { onClose(); copyText(item.id, '已复制标识') },
-      }, h(Icon, { size: 13 }, I.info()), '复制标识'),
-      item.cloud?.key
-        ? h('button', {
-            type: 'button', role: 'menuitem', className: 'ap-menuItem',
-            onClick: () => { onClose(); copyText(item.cloud.key, '已复制云端路径') },
-          }, h(Icon, { size: 13 }, I.cloud()), '复制云端路径')
-        : null,
       h('button', {
         type: 'button', role: 'menuitem', className: 'ap-menuItem', 'data-danger': 'true',
         onClick: () => { onClose(); requestDelete([item]) },
@@ -1305,6 +1335,14 @@
         h('div', { className: 'ap-modalFoot' },
           h('button', { type: 'button', className: 'ap-btn', onClick: () => downloadItem(item) },
             h(Icon, { size: 13 }, I.download()), '下载'),
+          // 云端条目：菜单里不再放「从云端下载」，改到这里 —— 预览时最清楚自己要的是哪一份
+          preview.data?.cloudKey
+            ? h('button', {
+                type: 'button', className: 'ap-btn',
+                title: '把云端那份重新拉回本地（可选目录）',
+                onClick: () => { close(); downloadCloud([item]) },
+              }, h(Icon, { size: 13 }, I.cloud()), '从云端下载')
+            : null,
           h('button', {
             type: 'button', className: 'ap-btn',
             onClick: () => revealItem(item),
@@ -1799,9 +1837,26 @@
         },
           h('option', { value: 'mtime:desc' }, '最近修改'),
           h('option', { value: 'mtime:asc' }, '最早修改'),
+          h('optgroup', { label: '创建时间' },
+            h('option', { value: 'created:desc' }, '最近创建'),
+            h('option', { value: 'created:asc' }, '最早创建')),
           h('option', { value: 'name:asc' }, '名称 A→Z'),
           h('option', { value: 'size:desc' }, '从大到小'),
           h('option', { value: 'size:asc' }, '从小到大')),
+        // 像相册一样按 年/月/日 分组；按名称或大小排序时分组没有意义，直接禁用
+        s.sort === 'mtime' || s.sort === 'created'
+          ? h('select', {
+              className: 'ap-select',
+              'aria-label': '分组',
+              title: '按时间分组（只对时间排序生效）',
+              value: s.group,
+              onChange: (event) => setState({ group: event.target.value }),
+            },
+              h('option', { value: 'none' }, '不分组'),
+              h('option', { value: 'year' }, '按年'),
+              h('option', { value: 'month' }, '按月'),
+              h('option', { value: 'day' }, '按日'))
+          : null,
         h('button', {
           type: 'button', className: 'ap-iconbtn',
           'aria-label': s.view === 'grid' ? '切换为列表' : '切换为网格',
@@ -1921,9 +1976,32 @@
       })
     }
 
-    const view = s.view === 'grid'
-      ? h('div', { className: 'ap-grid' }, s.items.map((item) => h(Card, { key: item.id, item })))
-      : h('div', { className: 'ap-list' }, s.items.map((item) => h(Row, { key: item.id, item })))
+    // 时间分组：按「修改」或「创建」把条目切成 年/月/日 段，像手机相册那样
+    const timeSort = s.sort === 'mtime' || s.sort === 'created'
+    const granularity = timeSort ? s.group : 'none'
+    const stampOf = (item) => (s.sort === 'created' ? (item.born ?? item.mtime) : item.mtime)
+    const renderList = (list) => (s.view === 'grid'
+      ? h('div', { className: 'ap-grid' }, list.map((item) => h(Card, { key: item.id, item })))
+      : h('div', { className: 'ap-list' }, list.map((item) => h(Row, { key: item.id, item }))))
+
+    let view
+    if (granularity === 'none') {
+      view = renderList(s.items)
+    } else {
+      const sections = new Map()
+      for (const item of s.items) {
+        const key = groupKeyOf(stampOf(item), granularity)
+        if (!sections.has(key)) sections.set(key, [])
+        sections.get(key).push(item)
+      }
+      view = h(React.Fragment, null, [...sections.entries()].map(([key, list]) => h('section', {
+        key, className: 'ap-group', 'data-group': key,
+      },
+        h('div', { className: 'ap-groupHead' },
+          h('span', { className: 'ap-groupTitle' }, groupLabelOf(key, granularity)),
+          h('span', { className: 'ap-groupCount' }, list.length + ' 个')),
+        renderList(list))))
+    }
 
     return h(React.Fragment, null,
       view,
@@ -2286,10 +2364,11 @@
       }
       const onKey = (event) => { if (event.key === 'Escape') setState({ menuId: null }) }
       window.addEventListener('mousedown', onDown)
-      window.addEventListener('keydown', onKey)
+      // 用捕获阶段：宿主（DSH shell）会在冒泡阶段吞掉 Escape，冒泡监听收不到
+      window.addEventListener('keydown', onKey, true)
       return () => {
         window.removeEventListener('mousedown', onDown)
-        window.removeEventListener('keydown', onKey)
+        window.removeEventListener('keydown', onKey, true)
       }
     }, [s.menuId])
 

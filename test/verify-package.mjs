@@ -27,8 +27,52 @@ check('main 指向的文件存在', existsSync(join(ROOT, pkg.main ?? 'missing')
 check('license 字段是 SPDX 标识', typeof pkg.license === 'string' && pkg.license.length > 0)
 check('LICENSE 文件存在', existsSync(join(ROOT, 'LICENSE')))
 check('CHANGELOG 存在且在 files 里', existsSync(join(ROOT, 'CHANGELOG.md')) && (pkg.files ?? []).includes('CHANGELOG.md'))
-check('docs 在 files 里（否则 npm 页面截图全裂）', (pkg.files ?? []).includes('docs'))
+// 截图不进 npm 包（5.6MB → 118KB），README 里必须用 GitHub 绝对地址；市场页读的是仓库里的 screenshots.json
+check('截图没有被打进 npm 包（目录瘦身）', !(pkg.files ?? []).includes('docs'))
 check('description 不是占位文案', typeof pkg.description === 'string' && pkg.description.length > 20)
+
+// ---- engines.dsh：装到当前宿主上必须满足（曾经写错成 0.x，会直接把安装挡掉）
+check('声明了 engines.dsh', typeof pkg.engines?.dsh === 'string' && pkg.engines.dsh.trim() !== '')
+if (typeof pkg.engines?.dsh === 'string') {
+  // 只支持 ">=A <B" / ">=A" 这种我们实际会写的形态，够用且不引依赖
+  const range = pkg.engines.dsh
+  const probe = '2.0.21-next' // 当前 DSH Desktop 的 app-boot 版本
+  const parse = (value) => {
+    const match = /^(\d+)\.(\d+)\.(\d+)(?:-([0-9A-Za-z.-]+))?$/.exec(value.trim())
+    if (match === null) return null
+    return { major: Number(match[1]), minor: Number(match[2]), patch: Number(match[3]), pre: match[4] ?? '' }
+  }
+  const compare = (left, right) => {
+    for (const key of ['major', 'minor', 'patch']) {
+      if (left[key] !== right[key]) return left[key] < right[key] ? -1 : 1
+    }
+    if (left.pre === right.pre) return 0
+    if (left.pre === '') return 1
+    if (right.pre === '') return -1
+    return left.pre < right.pre ? -1 : 1
+  }
+  const version = parse(probe)
+  let ok = version !== null
+  for (const part of range.split('||')) {
+    let branch = true
+    for (const token of part.trim().split(/\s+/)) {
+      const bound = /^(>=|<=|>|<|=)?(.+)$/.exec(token)
+      if (bound === null) { branch = false; break }
+      const target = parse(bound[2])
+      if (target === null) { branch = false; break }
+      const order = compare(version, target)
+      const operator = bound[1] ?? '='
+      if (operator === '>=' && !(order >= 0)) branch = false
+      if (operator === '>' && !(order > 0)) branch = false
+      if (operator === '<=' && !(order <= 0)) branch = false
+      if (operator === '<' && !(order < 0)) branch = false
+      if (operator === '=' && order !== 0) branch = false
+    }
+    if (branch) { ok = true; break }
+    ok = false
+  }
+  check(`engines.dsh 能接受当前宿主（${probe}）`, ok, range)
+}
 
 // ---- README 质量
 const imageRefs = [...readme.matchAll(/!\[[^\]]*\]\(([^)]+)\)/g)].map((match) => match[1])

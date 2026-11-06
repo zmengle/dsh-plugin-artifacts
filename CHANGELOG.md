@@ -2,6 +2,17 @@
 
 本项目遵循 [Semantic Versioning](https://semver.org/lang/zh-CN/)。
 
+## 2.0.1 — 2026-11-07
+
+**修复一个会让插件装不上的错误，请务必升级。**
+
+- **`engines.dsh` 写错了版本线**：2.0.0 里写的是 `>=0.2.1-rc.4 <0.3.0-0`（那是 harness 的版本号），
+  而 DSH 判断兼容性用的是宿主自身版本（当前 `2.0.21-next`）。结果 2.0.0 被判定为不兼容，
+  在市场里会被过滤、安装会被拒。现在改成 `>=2.0.0-0 <3.0.0-0`。
+- 发布前自检补上这一项：`npm run verify` 现在会用 `2.0.21-next` 试算 `engines.dsh`，写错直接失败。
+- `prepublishOnly` 挂上 `verify + test`，以后 `npm publish` 不会跳过检查。
+- 新增 GitHub Actions（Node 20 / 22 分别跑 `npm test` 和 `npm run verify`）。
+
 ## 2.0.0 — 2026-11-06
 
 **这是一个大版本：设置结构、索引版本、默认视图都变了，升级后会自动迁移，不需要手工处理。**

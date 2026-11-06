@@ -1,6 +1,6 @@
 {
   "name": "dsh-plugin-artifacts",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "type": "module",
   "description": "我的产物：DSH 侧栏一级入口 + 独立页面，管理会话/共享产物（网格与列表、类型筛选、预览、重命名、移动、回收站、zip 归档、可选 COS 云端手动上传）。",
   "repository": {

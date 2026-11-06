@@ -1,4 +1,4 @@
-/**
+﻿/**
  * dsh-plugin-artifacts — 「我的产物」· Host 半侧
  *
  * 一个侧栏一级入口 + 一个独立页面（Client 半侧），背后是这一层：
@@ -21,7 +21,7 @@ import { createArchive } from './lib/archive.js'
 import { createAutoSync } from './lib/autosync.js'
 import { createCloud } from './lib/cloud.js'
 import { createIndexer } from './lib/indexer.js'
-import { roleOf } from './lib/roles.js'
+import { ROLE_LIST, roleOf } from './lib/roles.js'
 import { createRolesStore } from './lib/roles-file.js'
 import { createSettingsStore } from './lib/settings.js'
 import { createTrash } from './lib/trash.js'
@@ -364,7 +364,9 @@ export function apply(ctx, passedConfig) {
         // 数字按「当前索引里能看到的」算：被扫成过程而没收录的，不该让「云端 4」对着空列表
         const visible = new Set(indexer.all().map((item) => item.id))
         const recorded = cloud.recordedIds().filter((id) => visible.has(id))
-        return { ...summary, uploaded: recorded.length, recordedTotal: summary.uploaded }
+        // 有记录但文件已经不在了（删除/挪走）—— 单独报出来，让用户能清
+        const orphans = cloud.orphanIds(visible)
+        return { ...summary, uploaded: recorded.length, recordedTotal: summary.uploaded, orphans: orphans.length }
       })(),
       settings: conf,
       roles: roles.stat(),
@@ -394,7 +396,10 @@ export function apply(ctx, passedConfig) {
       const key = match[1].toLowerCase()
       const value = match[2]
       if (key === 'type') parsed.kinds = value.split(',').filter((kind) => kind !== '')
-      else if (key === 'role') parsed.role = value
+      else if (key === 'role') {
+        // 非法角色直接忽略这个 token（搜索框边打字边请求，返回 400 会一直弹错误）
+        if (ROLE_LIST.includes(value) || value === 'all') parsed.role = value
+      }
       else parsed.session = value
     }
     return { q: text.join(' '), ...parsed }
@@ -544,14 +549,22 @@ export function apply(ctx, passedConfig) {
     const stat = statSync(targetAbs)
     const kind = kindOf(extOf(targetName))
 
+    const nextExt = extOf(targetName)
+    // 重命名 = 同一个文件换个名字：云端记录和人工标注都要**跟着迁移**，
+    // 否则会变成「仅本地」+ 桶里留一份孤儿（曾经的 bug）。
+    const cloudMigrated = cloud.migrate(id, nextId)
+    const roleMigrated = ensureStores().roles.migrate(id, nextId)
+    const manualRole = ensureStores().roles.roleOf(nextId)
+
     indexer.relocate(id, {
       id: nextId,
       path: targetPath,
       name: targetName,
       abs: targetAbs,
-      ext: extOf(targetName),
+      ext: nextExt,
       kind,
-      role: roleOf({ path: targetPath, name: targetName, ext: extOf(targetName) }),
+      role: manualRole ?? roleOf({ path: targetPath, name: targetName, ext: nextExt }),
+      roleSource: manualRole === undefined ? 'auto' : 'manual',
       size: stat.size,
       mtime: stat.mtimeMs,
       mtimeIso: new Date(stat.mtimeMs).toISOString(),
@@ -559,10 +572,12 @@ export function apply(ctx, passedConfig) {
       thumb: kind === 'image' ? `/api/dsh-artifacts/raw?id=${encodeURIComponent(nextId)}` : null,
       sha256: null,
     })
-    // 改名后云端映射按 id 记，旧 id 的映射没意义了
-    cloud.forget(id)
 
-    return { id: nextId, name: targetName, path: targetPath, abs: targetAbs }
+    return {
+      id: nextId, name: targetName, path: targetPath, abs: targetAbs,
+      cloudMigrated: cloudMigrated.migrated === true,
+      roleMigrated: roleMigrated.migrated === true,
+    }
   }
 
   async function deleteItems(body) {
@@ -723,6 +738,26 @@ export function apply(ctx, passedConfig) {
     }
     if (body?.runNow === true) await autoSync.runOnce()
     return autoSync.status()
+  }
+
+  /**
+   * 孤儿记录：有 `.cloud.json` 记录、但索引里已经没有对应文件（删除/挪走）。
+   * GET 列出；POST `{ purge: true }` 清掉（只删本地记录，不动桶里的对象）。
+   */
+  async function orphansEndpoint(method, body) {
+    const { cloud, indexer } = ensureStores()
+    const visible = new Set(indexer.all().map((item) => item.id))
+    const ids = cloud.orphanIds(visible)
+    if (method === 'GET') {
+      return { ids, items: ids.map((id) => ({ id, key: cloud.recordedKeyOf({ id }) ?? '' })) }
+    }
+    const target = Array.isArray(body?.ids) && body.ids.length > 0 ? readIds(body) : ids
+    let removed = 0
+    for (const id of target) {
+      cloud.forget(id)
+      removed += 1
+    }
+    return { removed, remaining: cloud.orphanIds(visible).length }
   }
 
   /**
@@ -939,6 +974,10 @@ export function apply(ctx, passedConfig) {
       ok(res, await autoSyncEndpoint('GET'))
       return
     }
+    if (req.method === 'GET' && action === '/cloud/orphans') {
+      ok(res, await orphansEndpoint('GET'))
+      return
+    }
     if (req.method !== 'POST') {
       res.writeHead(405, { allow: 'GET, POST' })
       res.end('method not allowed')
@@ -1015,6 +1054,9 @@ export function apply(ctx, passedConfig) {
         return
       case '/cloud/autosync':
         ok(res, await autoSyncEndpoint('POST', body))
+        return
+      case '/cloud/orphans':
+        ok(res, await orphansEndpoint('POST', body))
         return
       default:
         throw new AppError('E_NOT_FOUND', `未知端点 ${action || '/'}`, 404)

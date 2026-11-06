@@ -1,4 +1,4 @@
-﻿window.__ModuleLoader__.load({ id: 'dsh-plugin-artifacts', factory: (require) => {
+window.__ModuleLoader__.load({ id: 'dsh-plugin-artifacts', factory: (require) => {
   'use strict'
 
   // 运行时只依赖 react（平台种子表提供）：不引其它包、不假设构建步骤。
@@ -243,6 +243,8 @@
 /* 整理模式 */
 .ap-curateBtn{gap:5px;height:28px;font-size:12px}
 .ap-notice{display:flex;align-items:flex-start;gap:7px;margin:0 22px 10px;padding:8px 11px;border-radius:9px;border:1px solid color-mix(in srgb,var(--dsw-alias-border-l2) 70%,transparent);background:var(--dsw-alias-bg-layer-2);color:var(--dsw-alias-label-secondary);font-size:11.5px;line-height:1.6}
+.ap-curateSearch{padding:8px 16px 0}
+.ap-curateSearch .ap-input{width:100%;height:28px}
 .ap-curateBody{padding:12px 16px;max-height:min(62vh,560px)}
 .ap-curateGroup{border:1px solid var(--dsw-alias-border-l1);border-radius:10px;margin-bottom:10px;overflow:hidden}
 .ap-curateHead{display:flex;align-items:center;gap:6px;padding:6px 10px;background:var(--dsw-alias-bg-layer-2);font-size:11.5px;flex-wrap:wrap}
@@ -505,7 +507,7 @@
     loadingItems: false,
     facets: { kind: {}, scope: { session: 0, shared: 0, root: 0 }, role: { deliverable: 0, scratch: 0, memory: 0, asset: 0 }, total: 0 },
     byRole: { deliverable: 0, scratch: 0, memory: 0, asset: 0 },
-    curate: { open: false, loading: false, items: [], truncated: false },
+    curate: { open: false, loading: false, items: [], total: 0, truncated: false },
     selected: [],
     trash: { items: [], bytes: 0, retention: '30' },
     settings: { trashRetention: '30', showOthers: false, roots: [], scan: { deliverable: true, memory: true, session: false } },
@@ -1006,6 +1008,18 @@
     }
   }
 
+  /** 清掉「记录还在、文件没了」的孤儿记录（只删本地记录，不动桶里的对象）。 */
+  async function purgeOrphans() {
+    try {
+      const data = await rpc('/cloud/orphans', { purge: true })
+      await loadStatus()
+      await loadItems(true)
+      notify('已清理 ' + (data.removed ?? 0) + ' 条无效记录', 'ok')
+    } catch (error) {
+      notify('清理失败：' + String(error?.message || error), 'error')
+    }
+  }
+
   async function reconcileCloud() {
     setState({ cloud: Object.assign({}, state.cloud, { busy: true, reconcile: null }) })
     try {
@@ -1364,16 +1378,21 @@
   // 整理模式：按目录批量把文件归到 产物 / 过程 / 记忆
   // =========================================================================
 
-  async function openCurate() {
-    setState({ curate: { open: true, loading: true, items: [], truncated: false } })
+  async function openCurate(append) {
+    const offset = append === true ? state.curate.items.length : 0
+    setState({ curate: Object.assign({}, state.curate, { open: true, loading: append !== true }) })
     try {
       // role=all 才能看到过程/记忆；人工标注过的即使不在扫描范围里也会回来
-      const data = await rpc('/items', { role: 'all', limit: 200, sort: 'mtime', order: 'desc' })
+      const data = await rpc('/items', { role: 'all', limit: 200, offset, sort: 'mtime', order: 'desc' })
+      const items = append === true ? state.curate.items.concat(data.items) : data.items
       setState({
-        curate: { open: true, loading: false, items: data.items, truncated: data.hasMore === true },
+        curate: {
+          open: true, loading: false, items,
+          total: data.total, truncated: data.hasMore === true,
+        },
       })
     } catch (error) {
-      setState({ curate: { open: false, loading: false, items: [], truncated: false } })
+      setState({ curate: { open: false, loading: false, items: [], total: 0, truncated: false } })
       notify('读取文件列表失败：' + String(error?.message || error), 'error')
     }
   }
@@ -1395,6 +1414,7 @@
     const s = useStore()
     const curate = s.curate
     const [focused, setFocused] = React.useState(-1)
+    const [query, setQuery] = React.useState('')
 
     // 键盘：J/K（或 ↑/↓）移动，1/2/3 直接设角色，和列表顺序一致
     React.useEffect(() => {
@@ -1412,7 +1432,7 @@
           setFocused((index) => Math.max(0, index - 1))
           return
         }
-        const role = { 1: 'deliverable', 2: 'scratch', 3: 'memory' }[event.key]
+        const role = { 1: 'deliverable', 2: 'scratch', 3: 'memory', 4: 'asset' }[event.key]
         if (role !== undefined) {
           const item = curate.items[focused]
           if (item !== undefined) {
@@ -1426,11 +1446,21 @@
     }, [curate.open, curate.items, focused])
 
     if (curate.open !== true) return null
-    const close = () => setState({ curate: { open: false, loading: false, items: [], truncated: false } })
+    const close = () => setState({ curate: { open: false, loading: false, items: [], total: 0, truncated: false } })
+
+    // 搜索只在已加载的条目里过滤：整理时通常按名字找，不需要再打一次后端
+    const needle = query.trim().toLowerCase()
+    const visible = needle === ''
+      ? curate.items
+      : curate.items.filter((item) => (
+        String(item.name).toLowerCase().includes(needle)
+        || String(item.path).toLowerCase().includes(needle)
+        || String(item.sessionTitle ?? '').toLowerCase().includes(needle)
+      ))
 
     // 按「会话 · 目录」分组：批量操作以目录为单位最省事
     const groups = new Map()
-    for (const item of curate.items) {
+    for (const item of visible) {
       const dir = dirOf(item.path)
       const key = `${item.sessionTitle || item.session || '共享'} · ${dir === '' ? '根目录' : dir}`
       if (!groups.has(key)) groups.set(key, [])
@@ -1444,15 +1474,23 @@
           h('div', { className: 'ap-modalTitles' },
             h('div', { className: 'ap-modalTitle' }, '整理'),
             h('div', { className: 'ap-modalSub' },
-              `${curate.items.length} 个文件 · 人工标注 ${s.status?.roles?.manual ?? 0} 个`
-                + (curate.truncated ? ' · 只显示最近 200 个' : ''))),
+              `已加载 ${curate.items.length}/${curate.total ?? curate.items.length} 个`
+                + ` · 当前显示 ${visible.length} · 人工标注 ${s.status?.roles?.manual ?? 0}`)),
           h('button', { type: 'button', className: 'ap-iconbtn', 'aria-label': '关闭', onClick: close },
             h(Icon, { size: 15 }, I.close()))),
+        h('div', { className: 'ap-curateSearch' },
+          h('input', {
+            className: 'ap-input', type: 'search', value: query,
+            placeholder: '按文件名 / 路径筛选…', 'aria-label': '筛选文件',
+            onChange: (event) => { setQuery(event.target.value); setFocused(-1) },
+          })),
         h('div', { className: 'ap-modalBody ap-curateBody' },
           curate.loading
             ? h('div', { className: 'ap-loading' }, h('div', { className: 'ap-skelRow' },
               Array.from({ length: 6 }).map((_, index) => h('div', { key: index, className: 'ap-skel' }))))
-            : [...groups.entries()].map(([key, list]) => h('div', { key, className: 'ap-curateGroup' },
+            : visible.length === 0
+              ? h('div', { className: 'ap-hint', style: { padding: '16px 4px' } }, '没有匹配的文件')
+              : [...groups.entries()].map(([key, list]) => h('div', { key, className: 'ap-curateGroup' },
               h('div', { className: 'ap-curateHead' },
                 h('span', { className: 'ap-curateTitle' }, key, h('span', { className: 'ap-chipCount' }, list.length)),
                 h('span', { className: 'ap-spacer' }),
@@ -1469,15 +1507,21 @@
                 h('span', { className: 'ap-curateMeta' }, KIND_LABEL[item.kind] || item.kind, ' · ', humanBytes(item.size)),
                 item.roleSource === 'manual' ? h('span', { className: 'ap-badge', 'data-tone': 'role' }, '人工') : null,
                 h('span', { className: 'ap-spacer' }),
-                ['deliverable', 'scratch', 'memory'].map((role) => h('button', {
+                ['deliverable', 'scratch', 'memory', 'asset'].map((role) => h('button', {
                   key: role, type: 'button', className: 'ap-roleBtn',
                   'data-active': String(item.role === role),
                   'data-role': role,
                   onClick: () => setRoles([item.id], role),
                 }, ROLE_LABEL[role]))) )))),
         h('div', { className: 'ap-modalFoot' },
-          h('span', { className: 'ap-hint' }, '改动即时生效；J/K 移动、1/2/3 设角色；「恢复自动」按路径规则重新判定。'),
+          h('span', { className: 'ap-hint' }, '改动即时生效；J/K 移动、1/2/3/4 设角色；「恢复自动」按路径规则重新判定。'),
           h('div', { className: 'ap-spacer' }),
+          curate.items.length < (curate.total ?? 0)
+            ? h('button', {
+                type: 'button', className: 'ap-btn', disabled: curate.loading,
+                onClick: () => openCurate(true),
+              }, '加载更多（' + curate.items.length + '/' + (curate.total ?? 0) + '）')
+            : null,
           h('button', { type: 'button', className: 'ap-btn ap-btn--primary', onClick: close }, '完成'))))
   }
 
@@ -1713,6 +1757,7 @@
               ? `上次同步 ${timeLabel(s.status.autoSync.last.at)} · 传了 ${s.status.autoSync.last.uploaded} 个`
                 + (s.status.autoSync.last.failed > 0 ? ` · 失败 ${s.status.autoSync.last.failed}` : '')
                 + ` · 待同步 ${s.status.autoSync.candidates}`
+                + (s.status.autoSync.orphans > 0 ? ` · 失效 ${s.status.autoSync.orphans}（去云端页清理）` : '')
               : `还没跑过 · 待同步 ${s.status.autoSync.candidates} 个`),
 
           h('div', { className: 'ap-popTitle', style: { marginTop: 14 } }, '显示与清理'),
@@ -1784,6 +1829,7 @@
       { key: 'all', label: '全部' },
       { key: 'scratch', label: '过程' },
       { key: 'memory', label: '记忆' },
+      { key: 'asset', label: '素材' },
     ]
     const roleCount = (key) => (key === 'all'
       ? Object.values(s.byRole || {}).reduce((sum, value) => sum + value, 0)
@@ -1999,7 +2045,8 @@
       },
         h('div', { className: 'ap-groupHead' },
           h('span', { className: 'ap-groupTitle' }, groupLabelOf(key, granularity)),
-          h('span', { className: 'ap-groupCount' }, list.length + ' 个')),
+          // 还有没加载的条目时加个「+」：否则 74 条里只显示「48 个」会让人以为统计错了
+          h('span', { className: 'ap-groupCount' }, list.length + (s.hasMore ? '+' : '') + ' 个')),
         renderList(list))))
     }
 
@@ -2281,7 +2328,8 @@
     const configOpen = s.cloud.configOpen === null ? !enabled : s.cloud.configOpen === true
     // 有云端记录、但对应文件不在当前扫描范围（多为「过程」文件）时，说明一下，
     // 否则「云端 N」和列表对不上会让人以为数据丢了
-    const hiddenCloud = Math.max(0, (s.status?.cloud?.recordedTotal ?? 0) - (s.status?.cloud?.uploaded ?? 0))
+    const orphanCloud = s.status?.cloud?.orphans ?? 0
+    const hiddenCloud = Math.max(0, (s.status?.cloud?.recordedTotal ?? 0) - (s.status?.cloud?.uploaded ?? 0) - orphanCloud)
     return h(React.Fragment, null,
       configOpen
         ? h(CloudConfigForm, { onCollapse: () => setState({ cloud: Object.assign({}, s.cloud, { configOpen: false }) }) })
@@ -2290,6 +2338,16 @@
         ? h('div', { className: 'ap-notice' },
             h(Icon, { size: 13 }, I.info()),
             h('span', null, '另有 ', String(hiddenCloud), ' 个云端记录对应的文件当前不在扫描范围（多半是「过程」文件）。要到「设置 → 扫描类型」里打开「会话」才能看到它们。'))
+        : null,
+      // 文件被删/挪走，但云端记录还在：给一个明确的清理入口
+      orphanCloud > 0
+        ? h('div', { className: 'ap-notice' },
+            h(Icon, { size: 13 }, I.info()),
+            h('span', null, '有 ', String(orphanCloud), ' 条云端记录对应的本地文件已不在（删除或移出扫描范围），记录还在。'),
+            h('button', {
+              type: 'button', className: 'ap-btn ap-btn--ghost ap-btn--sm',
+              onClick: () => purgeOrphans(),
+            }, '清理记录'))
         : null,
       enabled
         ? h('div', { className: 'ap-panel' },
@@ -2378,7 +2436,7 @@
       const onKey = (event) => {
         if (event.key !== 'Escape') return
         if (s.curate.open === true) {
-          setState({ curate: { open: false, loading: false, items: [], truncated: false } })
+          setState({ curate: { open: false, loading: false, items: [], total: 0, truncated: false } })
           return
         }
         setState({ preview: null, dialog: null })

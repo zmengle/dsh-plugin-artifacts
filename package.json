@@ -23,16 +23,15 @@
     "lib",
     "cordis.patch.yml",
     "README.md",
-    "CHANGELOG.md",
-    "docs",
-    "screenshots.json"
+    "CHANGELOG.md"
   ],
   "scripts": {
     "test": "node test/smoke.mjs",
     "verify": "node test/verify-package.mjs"
   },
   "engines": {
-    "node": ">=20"
+    "node": ">=20",
+    "dsh": ">=0.2.1-rc.4 <0.3.0-0"
   },
   "dsh": {
     "bundle": {

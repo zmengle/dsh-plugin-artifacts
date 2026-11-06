@@ -37,12 +37,21 @@ check('CHANGELOG 存在且在 files 里', existsSync(join(ROOT, 'CHANGELOG.md'))
 check('截图没有被打进 npm 包（目录瘦身）', !(pkg.files ?? []).includes('docs'))
 check('description 不是占位文案', typeof pkg.description === 'string' && pkg.description.length > 20)
 
-// ---- engines.dsh：装到当前宿主上必须满足（曾经写错成 0.x，会直接把安装挡掉）
+// ---- engines.dsh：装到当前宿主上必须满足（曾经写错成 2.x，会直接把安装挡掉）
 check('声明了 engines.dsh', typeof pkg.engines?.dsh === 'string' && pkg.engines.dsh.trim() !== '')
 if (typeof pkg.engines?.dsh === 'string') {
   // 只支持 ">=A <B" / ">=A" 这种我们实际会写的形态，够用且不引依赖
   const range = pkg.engines.dsh
-  const probe = '2.0.21-next' // 当前 DSH Desktop 的 app-boot 版本
+  // 宿主比较用的是 @deepseek-ai/dsh-app-boot 的版本（见 DSH 的 getDshRuntimeVersion），
+  // 不是桌面端应用的版本号 —— 两者在这台机器上分别是 0.2.1-rc.4 和 2.0.21-next。
+  const probe = (() => {
+    if (process.env.DSH_APP_BOOT_VERSION) return process.env.DSH_APP_BOOT_VERSION
+    const manifest = join(ROOT, 'node_modules', '@deepseek-ai', 'dsh-app-boot', 'package.json')
+    if (existsSync(manifest)) {
+      try { return JSON.parse(readFileSync(manifest, 'utf8')).version } catch { /* fall through */ }
+    }
+    return '0.2.1-rc.4'
+  })()
   const parse = (value) => {
     const match = /^(\d+)\.(\d+)\.(\d+)(?:-([0-9A-Za-z.-]+))?$/.exec(value.trim())
     if (match === null) return null
